@@ -1,6 +1,6 @@
 const UsbPort = @import("types.zig").UsbPort;
 const UsbSpeed = @import("types.zig").UsbSpeed;
-const shim = @import("shim_tusb");
+const shim = @import("tusb_shim");
 
 pub fn init(port: UsbPort, speed: UsbSpeed, clock_speed: u32) void {
     shim.usb_init(@intFromEnum(port), shim.USB_ROLE_DEVICE, @intFromEnum(speed), clock_speed);

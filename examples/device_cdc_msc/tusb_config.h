@@ -26,27 +26,13 @@
 #ifndef TUSB_CONFIG_H_
 #define TUSB_CONFIG_H_
 
-//--------------------------------------------------------------------+
-// Board Specific Configuration
-//--------------------------------------------------------------------+
-
-// RHPort number used for device can be defined by board.mk, default to port 0
-#ifndef BOARD_TUD_RHPORT
-#define BOARD_TUD_RHPORT      0
-#endif
-
-// RHPort max operational speed can defined by board.mk
-#ifndef BOARD_TUD_MAX_SPEED
-#define BOARD_TUD_MAX_SPEED   OPT_MODE_DEFAULT_SPEED
-#endif
-
 //--------------------------------------------------------------------
 // Common Configuration
 //--------------------------------------------------------------------
 
 // defined by compiler flags for flexibility
 #ifndef CFG_TUSB_MCU
-#define OPT_MCU_STM32F4
+#define CFG_TUSB_MCU          OPT_MCU_STM32F4
 #endif
 
 #ifndef CFG_TUSB_OS
@@ -75,7 +61,7 @@
 #endif
 
 #ifndef CFG_TUSB_MEM_ALIGN
-#define CFG_TUSB_MEM_ALIGN    __attribute__ ((aligned(4)))
+#define CFG_TUSB_MEM_ALIGN
 #endif
 
 //--------------------------------------------------------------------

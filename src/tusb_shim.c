@@ -6,7 +6,7 @@
 uint32_t SystemCoreClock = 16000000;
 
 
-void usb_init(uint8_t port, usb_role_t role, usb_speed_t speed, uint32_t system_core_clock) {
+void usb_init(uint32_t port, usb_role_t role, usb_speed_t speed, uint32_t system_core_clock) {
     
     SystemCoreClock = system_core_clock;
     
@@ -21,11 +21,11 @@ void usb_init(uint8_t port, usb_role_t role, usb_speed_t speed, uint32_t system_
     tusb_init(port, &dev_init);
 }
 
-void usbd_irq(uint8_t port) { 
+void usbd_irq(uint32_t port) { 
     tud_int_handler(port); 
 }
 
-void usbh_irq(uint8_t port) { 
+void usbh_irq(uint32_t port) { 
     tuh_int_handler(port); 
 }
 

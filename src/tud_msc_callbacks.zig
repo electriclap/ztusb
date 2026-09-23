@@ -1,5 +1,5 @@
 // ---- TinyUSB helper we call from the defaults ----
-extern fn tud_msc_set_sense(lun: u8, sense_key: u8, add_sense_code: u8, add_sense_qualifier: u8) void;
+extern fn tud_msc_set_sense(lun: u8, sense_key: u8, asc: u8, ascq: u8) bool;
 
 const SENSE_NOT_READY: u8 = 0x02;
 const SENSE_ILLEGAL_REQUEST: u8 = 0x05;
@@ -15,26 +15,33 @@ pub const ScsiFn = *const fn (lun: u8, scsi_cmd: *const [16]u8, buffer: ?*anyopa
 // Default callbacks
 fn dummyInquiry(_: u8, _: *[8]u8, _: *[16]u8, _: *[4]u8) void {}
 
-fn dummyTestUnitReady(_: u8) bool {
+fn dummyTestUnitReady(lun: u8) bool {
+    _ = tud_msc_set_sense(lun, SENSE_NOT_READY, 0x3A, 0x00); // medium not present
     return false;
 }
 
-fn dummyCapacity(_: u8, _: *u32, _: *u16) void {}
+fn dummyCapacity(_: u8, block_count: *u32, block_size: *u16) void {
+    block_count.* = 0;
+    block_size.* = 512; // never leave 0
+}
 
 fn dummyStartStop(_: u8, _: u8, _: bool, _: bool) bool {
     return true;
 }
 
-fn dummyRead10(_: u8, _: u32, _: u32, _: [*]u8, _: u32) i32 {
-    return 0;
+fn dummyRead10(lun: u8, _: u32, _: u32, _: [*]u8, _: u32) i32 {
+    _ = tud_msc_set_sense(lun, SENSE_NOT_READY, 0x3A, 0x00);
+    return -1;
 }
 
-fn dummyWrite10(_: u8, _: u32, _: u32, _: [*]const u8, _: u32) i32 {
-    return 0;
+fn dummyWrite10(lun: u8, _: u32, _: u32, _: [*]const u8, _: u32) i32 {
+    _ = tud_msc_set_sense(lun, SENSE_NOT_READY, 0x3A, 0x00);
+    return -1;
 }
 
-fn dummyScsi(_: u8, _: *const [16]u8, _: ?*anyopaque, _: u16) i32 {
-    return 0;
+fn dummyScsi(lun: u8, _: *const [16]u8, _: ?*anyopaque, _: u16) i32 {
+    _ = tud_msc_set_sense(lun, SENSE_ILLEGAL_REQUEST, 0x20, 0x00); // invalid command
+    return -1;
 }
 
 // ---- Current handlers ----

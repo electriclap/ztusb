@@ -16,13 +16,13 @@ typedef enum {
   USB_SPEED_INVALID = 0xff,
 } usb_speed_t;
 
-void usb_init(uint8_t port, usb_role_t role, usb_speed_t speed, uint32_t system_core_clock);
+void usb_init(uint32_t port, usb_role_t role, usb_speed_t speed, uint32_t system_core_clock);
 
 void usbd_task(void);
-void usbd_irq(uint8_t port);
+void usbd_irq(uint32_t port);
 
 void usbh_task(void);
-void usbh_irq(uint8_t port);
+void usbh_irq(uint32_t port);
 
 bool     usbd_cdc_isconnected(void);
 uint32_t usbd_cdc_available(void);
