@@ -1,9 +1,7 @@
 const std = @import("std");
 
 pub const Driver = enum {
-    /// Synopsys DWC2 OTG core (STM32F2/F4/F7/H7 OTG_FS/HS, ...)
     dwc2,
-    /// ST "USB FS device" core (STM32F0/F1/F3/G4/L4, ...)
     fsdev,
 };
 
@@ -12,11 +10,14 @@ pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{});
 
     // build options
-    const driver = b.option(Driver, "driver", "USB device controller driver") orelse .dwc2;
-    const cdc = b.option(bool, "cdc", "Compile CDC device class") orelse false;
-    const midi = b.option(bool, "midi", "Compile MIDI device class") orelse false;
-    const msc = b.option(bool, "msc", "Compile MSC device class") orelse false;
-    const hid = b.option(bool, "hid", "Compile HID device class") orelse false;
+    const device = b.option(bool, "device", "Compile as a USB device") orelse false;
+    const host = b.option(bool, "host", "Compile as a USB host") orelse false;
+    const driver = b.option(Driver, "driver", "USB controller driver") orelse .dwc2;
+    const cdc = b.option(bool, "cdc", "Compile CDC class") orelse false;
+    // const midi1 = b.option(bool, "midi1", "Compile MIDI1 class") orelse false;
+    // const midi2 = b.option(bool, "midi2", "Compile MIDI2 class") orelse false;
+    const msc = b.option(bool, "msc", "Compile MSC class") orelse false;
+    // const hid = b.option(bool, "hid", "Compile HID class") orelse false;
 
     // dependencies
     const tusb_dep = b.dependency("tinyusb", .{});
@@ -39,16 +40,24 @@ pub fn build(b: *std.Build) void {
     tusb_translate.addIncludePath(foundation_dep.path("include"));
 
     // Actual module
-    const ztusb = tusb_translate.addModule("ztusb");
+    const ztusb = b.addModule("ztusb", .{
+        .root_source_file = b.path("src/root.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    ztusb.addImport("tusb_shim", tusb_translate.createModule());
 
     ztusb.addIncludePath(b.path("src"));
     ztusb.addIncludePath(tusb_dep.path("src"));
     ztusb.addIncludePath(cmsis_core.path("CMSIS/Core/Include"));
     ztusb.addIncludePath(foundation_dep.path("include"));
 
-    const flags: []const []const u8 = &.{"-fno-sanitize=undefined"};
+    const flags: []const []const u8 = &.{
+        "-std=c11",
+        "-fno-sanitize=undefined",
+        "-Wno-pointer-to-int-cast",
+    };
 
-    // adding source files
     var files: std.ArrayList([]const u8) = .empty;
     const a = b.allocator;
 
@@ -56,20 +65,37 @@ pub fn build(b: *std.Build) void {
         "tusb.c",
         "common/tusb_fifo.c",
         "device/usbd.c",
+        "host/hub.c",
+        "host/usbh.c",
     }) catch @panic("OOM");
 
     switch (driver) {
         .dwc2 => files.appendSlice(a, &.{
             "portable/synopsys/dwc2/dcd_dwc2.c",
             "portable/synopsys/dwc2/dwc2_common.c",
+            "portable/synopsys/dwc2/hcd_dwc2.c",
         }) catch @panic("OOM"),
-        .fsdev => @panic("TODO: fsdev port files"),
+        .fsdev => files.appendSlice(a, &.{
+            "portable/st/stm32_fsdev/dcd_stm32_fsdev.c",
+            "portable/st/stm32_fsdev/fsdev_common.c",
+            "portable/st/stm32_fsdev/hcd_stm32_fsdev.c",
+        }) catch @panic("OOM"),
     }
 
-    if (cdc) files.append(a, "class/cdc/cdc_device.c") catch @panic("OOM");
-    if (midi) files.append(a, "class/midi/midi_device.c") catch @panic("OOM");
-    if (msc) files.append(a, "class/msc/msc_device.c") catch @panic("OOM");
-    if (hid) files.append(a, "class/hid/hid_device.c") catch @panic("OOM");
+    if (cdc and device) files.append(a, "class/cdc/cdc_device.c") catch @panic("OOM");
+    if (cdc and host) files.append(a, "class/cdc/cdc_host.c") catch @panic("OOM");
+
+    // if (midi1 and device) files.append(a, "class/midi/midi_device.c") catch @panic("OOM");
+    // if (midi1 and host) files.append(a, "class/midi/midi_host.c") catch @panic("OOM");
+
+    // if (midi2 and device) files.append(a, "class/midi/midi2_device.c") catch @panic("OOM");
+    // if (midi2 and host) files.append(a, "class/midi/midi2_host.c") catch @panic("OOM");
+
+    if (msc and device) files.append(a, "class/msc/msc_device.c") catch @panic("OOM");
+    if (msc and host) files.append(a, "class/msc/msc_host.c") catch @panic("OOM");
+
+    // if (hid and device) files.append(a, "class/hid/hid_device.c") catch @panic("OOM");
+    // if (hid and host) files.append(a, "class/hid/hid_host.c") catch @panic("OOM");
 
     ztusb.addCSourceFiles(.{
         .root = tusb_dep.path("src"),
