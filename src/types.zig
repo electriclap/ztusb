@@ -1,4 +1,4 @@
-pub const UsbPort = enum(u32) {
+pub const UsbPort = enum(u8) {
     PORT0 = 0,
     PORT1 = 1,
 };

@@ -2,35 +2,36 @@ const UsbPort = @import("types.zig").UsbPort;
 const UsbSpeed = @import("types.zig").UsbSpeed;
 const shim = @import("tusb_shim");
 
-pub fn init(port: UsbPort, speed: UsbSpeed, clock_speed: u32) void {
-    shim.usb_init(@intFromEnum(port), shim.USB_ROLE_DEVICE, @intFromEnum(speed), clock_speed);
-}
+pub const Device = struct {
+    pub fn init(port: UsbPort, speed: UsbSpeed, clock_speed: u32) void {
+        shim.usbd_init(@intFromEnum(port), @intFromEnum(speed), clock_speed);
+    }
 
-pub fn task() void {
-    shim.usbd_task();
-}
+    pub fn inited() bool {
+        return shim.usbd_inited();
+    }
 
-pub fn irq(port: UsbPort) void {
-    shim.usbd_irq(@intFromEnum(port));
-}
+    pub fn irq(port: UsbPort) void {
+        shim.usbd_irq(@intFromEnum(port));
+    }
 
-pub const Cdc = struct {
-    pub fn isConnected() bool {
-        return shim.usbd_cdc_isconnected();
+    pub fn task() void {
+        shim.usbd_task();
     }
-    pub fn available() u32 {
-        return shim.usbd_cdc_available();
+
+    pub fn is_connected() bool {
+        return shim.usbd_is_connected();
     }
-    pub fn read(buf: []u8) usize {
-        return shim.usbd_cdc_read(buf.ptr, @intCast(buf.len));
+
+    pub fn is_mounted() bool {
+        return shim.usbd_is_mounted();
     }
-    pub fn write(buf: []const u8) usize {
-        return shim.usbd_cdc_write(buf.ptr, @intCast(buf.len));
+
+    pub fn is_suspended() bool {
+        return shim.usbd_is_suspended();
     }
-    pub fn write_flush() void {
-        shim.usbd_cdc_write_flush();
-    }
-    pub fn read_flush() void {
-        shim.usbd_cdc_read_flush();
+
+    pub fn is_ready() bool {
+        return shim.usbd_is_ready();
     }
 };

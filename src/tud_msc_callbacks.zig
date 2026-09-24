@@ -84,7 +84,7 @@ pub fn resetDefaults() void {
     handlers = .{};
 }
 
-// ---- Exported symbols TinyUSB links against ----
+/// Actual Tiny USB MSC callbacks
 export fn tud_msc_inquiry_cb(lun: u8, vendor_id: *[8]u8, product_id: *[16]u8, product_rev: *[4]u8) callconv(.c) void {
     handlers.inquiry(lun, vendor_id, product_id, product_rev);
 }
