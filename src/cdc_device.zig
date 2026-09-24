@@ -42,7 +42,7 @@ pub const CdcDevice = struct {
     }
 
     pub fn set_rx_callback(f: RxCallbackFn) void {
-        CdcDeviceCallbacks.on_rx = f;
+        cdc_device_callbacks.on_rx = f;
     }
 };
 
