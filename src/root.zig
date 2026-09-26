@@ -1,12 +1,15 @@
-pub const MscDevice = @import("msc_device.zig");
+const build_options = @import("build_options");
+
 pub const shim = @import("tusb_shim");
-pub const Device = @import("device.zig").Device;
-pub const CdcDevice = @import("cdc_device.zig").CdcDevice;
 pub const types = @import("types.zig");
 
-comptime {
-    _ = MscDevice;
-}
+pub const Device = @import("device.zig").Device;
+pub const CDC_Device = @import("cdc_device.zig").CDC_Device;
+
+pub const MSC_Device = if (build_options.msc_device and build_options.tud_enabled)
+    @import("msc_device.zig").MSC_Device
+else
+    struct {};
 
 // GENERAL CALLBACKS //
 

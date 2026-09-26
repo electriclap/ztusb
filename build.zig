@@ -8,35 +8,61 @@ pub const TusbDriver = enum {
 };
 
 const TusbConfig = struct {
-    mcu: []const u8,
-    os: []const u8,
-    debug: u8,
-    tud_enabled: bool,
-    tuh_enabled: bool,
-    max_speed: []const u8,
-    mem_section: ?[]const u8,
-    mem_alignment: u32,
-    endpoint0_size: u32,
-    cdc: bool,
-    msc: bool,
-    hid: bool,
-    midi: bool,
-    vendor: bool,
-    cdc_notify: bool,
-    cdc_rx_bufsize_hs: u32,
-    cdc_rx_bufsize_fs: u32,
-    cdc_tx_bufsize_hs: u32,
-    cdc_tx_bufsize_fs: u32,
-    cdc_rx_epsize_hs: u32,
-    cdc_rx_epsize_fs: u32,
-    cdc_tx_epsize_hs: u32,
-    cdc_tx_epsize_fs: u32,
-    msc_ep_bufsize: u32,
+    mcu: []const u8 = "STM32F4",
+    os: []const u8 = "NONE",
+    debug: u8 = 0,
+    tud_enabled: bool = false,
+    tuh_enabled: bool = false,
+    max_speed: []const u8 = "OPT_MODE_FULL_SPEED",
+    mem_section: []const u8 = "",
+    mem_alignment: u32 = 4,
+    endpoint0_size: u32 = 64,
+
+    cdc_device: bool = false,
+    msc_device: bool = false,
+    hid_device: bool = false,
+    midi_device: bool = false,
+
+    cdc_notify: bool = true,
+
+    cdc_rx_bufsize_hs: u32 = 512,
+    cdc_rx_bufsize_fs: u32 = 64,
+    cdc_tx_bufsize_hs: u32 = 512,
+    cdc_tx_bufsize_fs: u32 = 64,
+    cdc_rx_epsize_hs: u32 = 512,
+    cdc_rx_epsize_fs: u32 = 64,
+    cdc_tx_epsize_hs: u32 = 512,
+    cdc_tx_epsize_fs: u32 = 64,
+
+    midi_rx_bufsize_hs: u32 = 512,
+    midi_rx_bufsize_fs: u32 = 64,
+    midi_tx_bufsize_hs: u32 = 512,
+    midi_tx_bufsize_fs: u32 = 64,
+
+    msc_ep_bufsize: u32 = 512,
 };
+
+fn readTusbConfig(b: *std.Build) TusbConfig {
+    var cfg: TusbConfig = .{};
+
+    const member = @typeInfo(TusbConfig).@"struct";
+    inline for (member.field_names, member.field_types) |name, FieldType| {
+        const default = @field(cfg, name);
+        const value = b.option(
+            FieldType,
+            name,
+            "TinyUSB config: " ++ name,
+        ) orelse default;
+
+        @field(cfg, name) = value;
+    }
+
+    return cfg;
+}
 
 fn formatTusbConfigHeader(b: *std.Build, cfg: TusbConfig) []const u8 {
     const mem_section_config_str: []const u8 = blk: {
-        const section = cfg.mem_section orelse break :blk "";
+        const section = cfg.mem_section;
         if (section.len == 0) break :blk "";
         break :blk std.fmt.allocPrint(
             b.allocator,
@@ -81,16 +107,25 @@ fn formatTusbConfigHeader(b: *std.Build, cfg: TusbConfig) []const u8 {
         \\#define CFG_TUD_MSC              {d}
         \\#define CFG_TUD_HID              {d}
         \\#define CFG_TUD_MIDI             {d}
-        \\#define CFG_TUD_VENDOR           {d}
+        \\#define CFG_TUD_MIDI2            0
+        \\
+        \\#define CFG_TUH_CDC              0
+        \\#define CFG_TUH_MSC              0
+        \\#define CFG_TUH_HID              0
+        \\#define CFG_TUH_MIDI             0
+        \\#define CFG_TUH_MIDI2            0
+        \\
         \\
         \\#define CFG_TUD_CDC_NOTIFY        {d}
+        \\#define CFG_TUD_CDC_RX_BUFSIZE    (TUD_OPT_HIGH_SPEED ? {d} : {d})
+        \\#define CFG_TUD_CDC_TX_BUFSIZE    (TUD_OPT_HIGH_SPEED ? {d} : {d})
+        \\#define CFG_TUD_CDC_RX_EPSIZE     (TUD_OPT_HIGH_SPEED ? {d} : {d})
+        \\#define CFG_TUD_CDC_TX_EPSIZE     (TUD_OPT_HIGH_SPEED ? {d} : {d})
         \\
-        \\#define CFG_TUD_CDC_RX_BUFSIZE   (TUD_OPT_HIGH_SPEED ? {d} : {d})
-        \\#define CFG_TUD_CDC_TX_BUFSIZE   (TUD_OPT_HIGH_SPEED ? {d} : {d})
-        \\#define CFG_TUD_CDC_RX_EPSIZE  (TUD_OPT_HIGH_SPEED ? {d} : {d})
-        \\#define CFG_TUD_CDC_TX_EPSIZE  (TUD_OPT_HIGH_SPEED ? {d} : {d})
+        \\#define CFG_TUD_MSC_EP_BUFSIZE    {d}
         \\
-        \\#define CFG_TUD_MSC_EP_BUFSIZE   {d}
+        \\#define CFG_TUD_MIDI_RX_BUFSIZE   (TUD_OPT_HIGH_SPEED ? {d} : {d})
+        \\#define CFG_TUD_MIDI_TX_BUFSIZE   (TUD_OPT_HIGH_SPEED ? {d} : {d})
         \\
         \\#endif /* TUSB_CONFIG_H_ */
         \\
@@ -104,11 +139,10 @@ fn formatTusbConfigHeader(b: *std.Build, cfg: TusbConfig) []const u8 {
         mem_section_config_str,
         cfg.mem_alignment,
         cfg.endpoint0_size,
-        @intFromBool(cfg.cdc),
-        @intFromBool(cfg.msc),
-        @intFromBool(cfg.hid),
-        @intFromBool(cfg.midi),
-        @intFromBool(cfg.vendor),
+        @intFromBool(cfg.cdc_device),
+        @intFromBool(cfg.msc_device),
+        @intFromBool(cfg.hid_device),
+        @intFromBool(cfg.midi_device),
         @intFromBool(cfg.cdc_notify),
         cfg.cdc_rx_bufsize_hs,
         cfg.cdc_rx_bufsize_fs,
@@ -119,6 +153,10 @@ fn formatTusbConfigHeader(b: *std.Build, cfg: TusbConfig) []const u8 {
         cfg.cdc_tx_epsize_hs,
         cfg.cdc_tx_epsize_fs,
         cfg.msc_ep_bufsize,
+        cfg.midi_rx_bufsize_hs,
+        cfg.midi_rx_bufsize_fs,
+        cfg.midi_tx_bufsize_hs,
+        cfg.midi_tx_bufsize_fs,
     }) catch @panic("OOM");
 }
 
@@ -128,38 +166,14 @@ pub fn build(b: *std.Build) void {
 
     // build options
     const driver = b.option(TusbDriver, "driver", "USB controller driver") orelse .dwc2;
+    const cfg = readTusbConfig(b);
 
-    const cfg = TusbConfig{
-        .mcu = b.option([]const u8, "mcu", "MCU name suffix, e.g. STM32F4 (-> OPT_MCU_STM32F4)") orelse "STM32F4",
-        .os = b.option([]const u8, "os", "RTOS name suffix, e.g. NONE, FREERTOS (-> OPT_OS_NONE)") orelse "NONE",
+    const options = b.addOptions();
 
-        .debug = b.option(u8, "debug", "CFG_TUSB_DEBUG level") orelse 0,
-        .tud_enabled = b.option(bool, "device", "Enable USB device stack") orelse false,
-        .tuh_enabled = b.option(bool, "host", "Enable USB host stack") orelse false,
-        .max_speed = b.option([]const u8, "max_speed", "CFG_TUD_MAX_SPEED value") orelse "OPT_MODE_FULL_SPEED",
-        .mem_section = b.option([]const u8, "mem_section", "RAM section name for DMA buffers (e.g. .dma_buffer)"), // can be null on purpose
-        .mem_alignment = b.option(u32, "mem_align", "CFG_TUSB_MEM_ALIGN value") orelse 4,
-        .endpoint0_size = b.option(u32, "ep0_size", "CFG_TUD_ENDPOINT0_SIZE") orelse 64,
-
-        .cdc = b.option(bool, "cdc", "Enable CDC class") orelse true,
-        .msc = b.option(bool, "msc", "Enable MSC class") orelse false,
-        .hid = b.option(bool, "hid", "Enable HID class") orelse false,
-        .midi = b.option(bool, "midi", "Enable MIDI class") orelse false,
-        .vendor = b.option(bool, "vendor", "Enable vendor class") orelse false,
-
-        .cdc_notify = b.option(bool, "cdc_notify", "Enable CDC notify endpoint") orelse true,
-
-        .cdc_rx_bufsize_hs = b.option(u32, "cdc_rx_bufsize_hs", "") orelse 512,
-        .cdc_rx_bufsize_fs = b.option(u32, "cdc_rx_bufsize_fs", "") orelse 64,
-        .cdc_tx_bufsize_hs = b.option(u32, "cdc_tx_bufsize_hs", "") orelse 512,
-        .cdc_tx_bufsize_fs = b.option(u32, "cdc_tx_bufsize_fs", "") orelse 64,
-        .cdc_rx_epsize_hs = b.option(u32, "cdc_rx_epsize_hs", "") orelse 512,
-        .cdc_rx_epsize_fs = b.option(u32, "cdc_rx_epsize_fs", "") orelse 64,
-        .cdc_tx_epsize_hs = b.option(u32, "cdc_tx_epsize_hs", "") orelse 512,
-        .cdc_tx_epsize_fs = b.option(u32, "cdc_tx_epsize_fs", "") orelse 64,
-
-        .msc_ep_bufsize = b.option(u32, "msc_ep_bufsize", "") orelse 512,
-    };
+    const member = @typeInfo(TusbConfig).@"struct";
+    inline for (member.field_names, member.field_types) |name, FieldType| {
+        options.addOption(FieldType, name, @field(cfg, name));
+    }
 
     // config header autogen from build options
     const header_contents = formatTusbConfigHeader(b, cfg);
@@ -193,6 +207,7 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     ztusb.addImport("tusb_shim", tusb_translate.createModule());
+    ztusb.addImport("build_options", options.createModule());
 
     ztusb.addIncludePath(b.path("src"));
     ztusb.addIncludePath(tusb_dep.path("src"));

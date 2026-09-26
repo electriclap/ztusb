@@ -113,7 +113,7 @@ uint32_t usbd_cdc_write(const uint8_t *buf, uint32_t len) {
     return tud_cdc_write(buf, len);
 }
 
-uint32_t usbd_cdc_write_char(char ch){
+uint32_t usbd_cdc_write_char(char ch) {
     return tud_cdc_write_char(ch);
 }
 
@@ -122,6 +122,15 @@ void usbd_cdc_write_flush(void) {
 }
 #endif
 
+#if CFG_TUD_ENABLED && CFG_TUD_MSC
+bool usbd_msc_set_sense(uint8_t lun, uint8_t sense_key, uint8_t add_sense_code, uint8_t add_sense_qualifier) {
+    return tud_msc_set_sense(lun, sense_key, add_sense_code, add_sense_qualifier);
+}
+
+bool usbd_msc_async_io_done(int32_t bytes_io, bool in_isr) {
+    return tud_msc_async_io_done(bytes_io, in_isr);
+}
+#endif
 
 /* usb host cdc shimed API */
 // TODO

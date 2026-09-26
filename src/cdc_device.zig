@@ -1,7 +1,7 @@
 const shim = @import("tusb_shim");
 
 /// Encapsulate cdc_device API. Only supports one CDC atm.
-pub const CdcDevice = struct {
+pub const CDC_Device = struct {
     pub fn is_ready() bool {
         return shim.usbd_cdc_is_ready();
     }
@@ -16,7 +16,7 @@ pub const CdcDevice = struct {
         return shim.usbd_cdc_available();
     }
 
-    pub fn read_buf(buf: []u8) usize {
+    pub fn read(buf: []u8) usize {
         return shim.usbd_cdc_read(buf.ptr, @intCast(buf.len));
     }
 
@@ -29,7 +29,7 @@ pub const CdcDevice = struct {
         shim.usbd_cdc_read_flush();
     }
 
-    pub fn write_buf(buf: []const u8) usize {
+    pub fn write(buf: []const u8) usize {
         return shim.usbd_cdc_write(buf.ptr, @intCast(buf.len));
     }
 
@@ -41,25 +41,18 @@ pub const CdcDevice = struct {
         shim.usbd_cdc_write_flush();
     }
 
-    pub fn set_rx_callback(f: RxCallbackFn) void {
-        cdc_device_callbacks.on_rx = f;
+    /// call through a comptime block to map tiny usb cdc device callbacks to yours
+    pub fn export_callbacks(comptime Impl: type) void {
+        inline for (.{"on_rx"}) |name| {
+            if (!@hasDecl(Impl, name))
+                @compileLog("Cdc Device callbacks namesapce is missing `pub fn " ++ name ++ "`");
+        }
+
+        const S = struct {
+            fn on_rx_callback(itf: u8) callconv(.c) void {
+                return Impl.on_rx(itf);
+            }
+        };
+        @export(&S.on_rx_callback, .{ .name = "tud_cdc_rx_cb" });
     }
 };
-
-// CALLBACKS //
-
-pub const RxCallbackFn = *const fn (itf: u8) void;
-
-const CdcDeviceCallbacks = struct {
-    on_rx: RxCallbackFn = default_rx_callback,
-};
-
-var cdc_device_callbacks: CdcDeviceCallbacks = .{};
-
-fn default_rx_callback(itf: u8) void {
-    _ = itf;
-}
-
-export fn tud_cdc_rx_cb(itf: u8) callconv(.c) void {
-    return cdc_device_callbacks.on_rx(itf);
-}
