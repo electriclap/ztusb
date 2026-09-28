@@ -1,45 +1,10 @@
 const std = @import("std");
+const TusbDriver = @import("src/build_utils/build_types.zig").TusbDriver;
+const TusbConfig = @import("src/build_utils/build_types.zig").TusbConfig;
 
-pub const TusbDriver = enum {
-    dwc2,
-    fsdev,
-    rp2040,
-    pio_usb,
-};
+const GenConfig = @import("src/build_utils/generate_config_h.zig");
 
-const TusbConfig = struct {
-    mcu: []const u8 = "OPT_MCU_STM32F4",
-    os: []const u8 = "OPT_OS_NONE",
-    debug: u8 = 0,
-
-    device: bool = false,
-    host: bool = false,
-    device_max_speed: []const u8 = "OPT_MODE_FULL_SPEED",
-    host_max_speed: []const u8 = "OPT_MODE_FULL_SPEED",
-
-    mem_section: []const u8 = "",
-    mem_alignment: u32 = 4,
-
-    endpoint0_size: u32 = 64,
-
-    cdc_device: bool = false,
-    msc_device: bool = false,
-    hid_device: bool = false,
-    midi_device: bool = false,
-
-    cdc_notify: bool = true,
-    cdc_rx_bufsize: u32 = 64,
-    cdc_tx_bufsize: u32 = 64,
-    cdc_rx_epsize: u32 = 64,
-    cdc_tx_epsize: u32 = 64,
-
-    midi_rx_bufsize: u32 = 64,
-    midi_tx_bufsize: u32 = 64,
-
-    msc_ep_bufsize: u32 = 512,
-};
-
-fn createTusbOptions(b: *std.Build) TusbConfig {
+fn create_tusb_build_options(b: *std.Build) TusbConfig {
     var cfg: TusbConfig = .{};
 
     const member = @typeInfo(TusbConfig).@"struct";
@@ -57,49 +22,168 @@ fn createTusbOptions(b: *std.Build) TusbConfig {
     return cfg;
 }
 
-fn createTusbConfigHeader(b: *std.Build, config: TusbConfig) *std.Build.Step.ConfigHeader {
-    const header = b.addConfigHeader(.{
-        .style = .blank,
-        .include_path = "tusb_config.h",
-    }, .{});
+fn create_tusb_descriptors_file(b: *std.Build, config: TusbConfig) []u8 {
+    var next_index: u8 = 4;
 
-    header.addIdent("CFG_TUSB_MCU", config.mcu);
-    header.addIdent("CFG_TUSB_OS", config.os);
-    header.addValue("CFG_TUSB_DEBUG", u8, config.debug);
+    var cdc_index: u8 = 0;
+    var msc_index: u8 = 0;
 
-    header.addValue("CFG_TUD_ENABLED", bool, config.device);
-    header.addValue("CFG_TUH_ENABLED", bool, config.host);
+    var fs_config_cdc: []u8 = "";
+    // var string_desc_cdc: []u8 = "";
 
-    header.addIdent("CFG_TUD_MAX_SPEED", config.device_max_speed);
-    header.addIdent("CFG_TUH_MAX_SPEED", config.host_max_speed);
+    var fs_config_msc: []u8 = "";
+    // var string_desc_msc: []u8 = "";
 
-    var formatted_mem_section: []const u8 = "";
-    if (config.mem_section.len > 0) {
-        formatted_mem_section = std.fmt.allocPrint(b.allocator, "__attribute__((section(\"{s}\")))", .{config.mem_section}) catch @panic("OOM");
+    if (config.cdc_device == true) {
+        cdc_index = next_index;
+        next_index += 1;
+        fs_config_cdc = b.allocator.print(
+            "TUD_CDC_DESCRIPTOR(ITF_NUM_CDC, 4, EPNUM_CDC_NOTIF, 16, EPNUM_CDC_OUT, EPNUM_CDC_IN, 64),",
+            .{},
+        ) catch @panic("OOM");
     }
-    header.addIdent("CFG_TUSB_MEM_SECTION", formatted_mem_section);
 
-    const formatted_mem_align: []const u8 = std.fmt.allocPrint(b.allocator, "__attribute__ ((aligned({d})))", .{config.mem_alignment}) catch @panic("OOM");
-    header.addIdent("CFG_TUSB_MEM_ALIGN", formatted_mem_align);
+    if (config.msc_device == true) {
+        msc_index = next_index;
+        next_index += 1;
+        fs_config_msc = b.allocator.print(
+            "TUD_MSC_DESCRIPTOR(ITF_NUM_MSC, 5, EPNUM_MSC_OUT, EPNUM_MSC_IN, 64),",
+            .{},
+        ) catch @panic("OOM");
+    }
 
-    header.addValue("CFG_TUD_ENDPOINT0_SIZE", u32, config.endpoint0_size);
+    const descriptors_file: []u8 = b.allocator.print(
+        \\/*
+        \\ * The MIT License (MIT)
+        \\ *
+        \\ * Copyright (c) 2019 Ha Thach (tinyusb.org)
+        \\ *
+        \\ * Permission is hereby granted, free of charge, to any person obtaining a copy
+        \\ * of this software and associated documentation files (the "Software"), to deal
+        \\ * in the Software without restriction, including without limitation the rights
+        \\ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+        \\ * copies of the Software, and to permit persons to whom the Software is
+        \\ * furnished to do so, subject to the following conditions:
+        \\ *
+        \\ * The above copyright notice and this permission notice shall be included in
+        \\ * all copies or substantial portions of the Software.
+        \\ *
+        \\ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+        \\ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+        \\ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+        \\ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+        \\ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+        \\ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+        \\ * THE SOFTWARE.
+        \\ *
+        \\ */
+        \\
+        \\#include "tusb.h"
+        \\
+        \\//--------------------------------------------------------------------+
+        \\// Device Descriptors
+        \\//--------------------------------------------------------------------+
+        \\static tusb_desc_device_t const desc_device = {{
+        \\    .bLength            = sizeof(tusb_desc_device_t),
+        \\    .bDescriptorType    = TUSB_DESC_DEVICE,
+        \\    .bcdUSB             = 0x{x},
+        \\    .bDeviceClass       = TUSB_CLASS_MISC,
+        \\    .bDeviceSubClass    = MISC_SUBCLASS_COMMON,
+        \\    .bDeviceProtocol    = MISC_PROTOCOL_IAD,
+        \\    .bMaxPacketSize0    = CFG_TUD_ENDPOINT0_SIZE,
+        \\
+        \\    .idVendor           = 0x{x},
+        \\    .idProduct          = 0x{x},
+        \\    .bcdDevice          = 0x0100,
+        \\
+        \\    .iManufacturer      = 0x01,
+        \\    .iProduct           = 0x02,
+        \\    .iSerialNumber      = 0x03,
+        \\
+        \\    .bNumConfigurations = 0x01
+        \\}};
+        \\
+        \\uint8_t const *tud_descriptor_device_cb(void) {{
+        \\  return (uint8_t const *) &desc_device;
+        \\}}
+        \\
+        \\enum {{ // TODO
+        \\  ITF_NUM_CDC = 0,
+        \\  ITF_NUM_CDC_DATA,
+        \\  ITF_NUM_MSC,
+        \\  ITF_NUM_TOTAL
+        \\}};
+        \\
+        \\static uint8_t const desc_fs_configuration[] = {{
+        \\    // Config number, interface count, string index, total length, attribute, power in mA
+        \\    TUD_CONFIG_DESCRIPTOR(1, ITF_NUM_TOTAL, 0, CONFIG_TOTAL_LEN, 0x00, 100),
+        \\
+        \\    // Interface number, string index, EP notification address and size, EP data address (out, in) and size.
+        \\    {s}
+        \\
+        \\    // Interface number, string index, EP Out & EP In address, EP size
+        \\    {s}
+        \\}};
+        \\
+        \\
+        \\uint8_t const *tud_descriptor_configuration_cb(uint8_t index) {{
+        \\  (void) index; // for multiple configurations
+        \\  return desc_fs_configuration;
+        \\}}
+        \\
+        \\
+        \\enum {{
+        \\  STRID_LANGID = 0,
+        \\  STRID_MANUFACTURER,
+        \\  STRID_PRODUCT,
+        \\  STRID_SERIAL,
+        \\}};
+        \\
+        \\// array of pointer to string descriptors
+        \\static char const *string_desc_arr[] = {{
+        \\    (const char[]) {{ 0x09, 0x04 }}, // 0: is supported language is English (0x0409)
+        \\    "TinyUSB",                     // 1: Manufacturer // TODO
+        \\    "TinyUSB Device",              // 2: Product // TODO
+        \\    {s},                           // 3: Serials will use unique ID if possible
+        \\    "TinyUSB CDC", // TODO
+        \\    "TinyUSB MSC", // TODO
+        \\}};
+        \\
+        \\static uint16_t _desc_str[32 + 1];
+        \\
+        \\uint16_t const *tud_descriptor_string_cb(uint8_t index, uint16_t langid) {{
+        \\  (void) langid;
+        \\  size_t chr_count;
+        \\
+        \\  switch ( index ) {{
+        \\    case STRID_LANGID:
+        \\      memcpy(&_desc_str[1], string_desc_arr[0], 2);
+        \\      chr_count = 1;
+        \\      break;
+        \\
+        \\    default:
+        \\      if ( !(index < sizeof(string_desc_arr) / sizeof(string_desc_arr[0])) ) {{ return NULL; }}
+        \\
+        \\      const char *str = string_desc_arr[index];
+        \\
+        \\      // Cap at max char
+        \\      chr_count = strlen(str);
+        \\      size_t const max_count = sizeof(_desc_str) / sizeof(_desc_str[0]) - 1; // -1 for string type
+        \\      if ( chr_count > max_count ) {{ chr_count = max_count; }}
+        \\
+        \\      // Convert ASCII string into UTF-16
+        \\      for ( size_t i = 0; i < chr_count; i++ ) {{
+        \\        _desc_str[1 + i] = str[i];
+        \\      }}
+        \\      break;
+        \\  }}
+        \\
+        \\  _desc_str[0] = (uint16_t) ((TUSB_DESC_STRING << 8) | (2 * chr_count + 2));
+        \\  return _desc_str;
+        \\}}
+    , .{ config.bcd, config.vid, config.pid, fs_config_cdc, fs_config_msc, config.id }) catch @panic("OOM");
 
-    header.addValue("CFG_TUD_CDC", bool, config.cdc_device);
-    header.addValue("CFG_TUD_MSC", bool, config.msc_device);
-    header.addValue("CFG_TUD_HID", bool, config.hid_device);
-    header.addValue("CFG_TUD_MIDI", bool, config.midi_device);
-
-    header.addValue("CFG_TUD_CDC_RX_BUFSIZE", u32, config.cdc_rx_bufsize);
-    header.addValue("CFG_TUD_CDC_TX_BUFSIZE", u32, config.cdc_tx_bufsize);
-    header.addValue("CFG_TUD_CDC_RX_EPSIZE", u32, config.cdc_rx_epsize);
-    header.addValue("CFG_TUD_CDC_TX_EPSIZE", u32, config.cdc_tx_epsize);
-
-    header.addValue("CFG_TUD_MSC_EP_BUFSIZE", u32, config.msc_ep_bufsize);
-
-    header.addValue("CFG_TUD_MIDI_RX_BUFSIZE", u32, config.midi_rx_bufsize);
-    header.addValue("CFG_TUD_MIDI_TX_BUFSIZE", u32, config.midi_tx_bufsize);
-
-    return header;
+    return descriptors_file;
 }
 
 pub fn build(b: *std.Build) void {
@@ -109,7 +193,7 @@ pub fn build(b: *std.Build) void {
     // build options
     const driver = b.option(TusbDriver, "driver", "USB controller driver") orelse .dwc2;
 
-    const cfg = createTusbOptions(b);
+    const cfg = create_tusb_build_options(b);
 
     // we want to expose build options for facilitating usb_descriptors.c file generation
     const options = b.addOptions();
@@ -119,7 +203,11 @@ pub fn build(b: *std.Build) void {
     }
 
     // config header autogen from build options
-    const tusb_config_header = createTusbConfigHeader(b, cfg);
+    const tusb_config_header = GenConfig.create_tusb_config_header(b, cfg);
+
+    const descriptors_file: []const u8 = create_tusb_descriptors_file(b, cfg);
+    const wf = b.addWriteFiles();
+    const descriptors_c = wf.add("usb_descriptors.c", descriptors_file);
 
     // dependencies
     const tusb_dep = b.dependency("tinyusb", .{});
@@ -219,6 +307,19 @@ pub fn build(b: *std.Build) void {
         .files = &.{"tusb_shim.c"},
         .flags = flags,
     });
+
+    ztusb.addCSourceFile(.{
+        .file = descriptors_c,
+        .flags = flags,
+    });
+
+    // for debug
+    b.getInstallStep().dependOn(
+        &b.addInstallFileWithDir(descriptors_c, .prefix, "usb_descriptors.c").step,
+    );
+    b.getInstallStep().dependOn(
+        &b.addInstallFileWithDir(tusb_config_header.getOutputFile(), .prefix, "tusb_config.h").step,
+    );
 
     ztusb.linkLibrary(foundation);
     b.modules.put(b.allocator, b.dupe("ztusb"), ztusb) catch @panic("OOM");
