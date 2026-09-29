@@ -1,6 +1,6 @@
 const std = @import("std");
-const TusbDriver = @import("build_types.zig").TusbDriver;
-const TusbConfig = @import("build_types.zig").TusbConfig;
+const TusbDriver = @import("../../build.zig").TusbDriver;
+const TusbConfig = @import("../../build.zig").TusbConfig;
 
 const CONFIG_DESC_LEN: u32 = 9;
 const DEVICE_CDC_DESC_LEN: u32 = 66;

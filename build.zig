@@ -1,190 +1,57 @@
 const std = @import("std");
-const TusbDriver = @import("src/build_utils/build_types.zig").TusbDriver;
-const TusbConfig = @import("src/build_utils/build_types.zig").TusbConfig;
 
+const GenDescriptors = @import("src/build_utils/generate_descriptors_c.zig");
 const GenConfig = @import("src/build_utils/generate_config_h.zig");
 
-fn create_tusb_build_options(b: *std.Build) TusbConfig {
-    var cfg: TusbConfig = .{};
+pub const TusbDriver = enum {
+    dwc2,
+    fsdev,
+    rp2040,
+    pio_usb,
+};
 
-    const member = @typeInfo(TusbConfig).@"struct";
-    inline for (member.field_names, member.field_types) |name, FieldType| {
-        const default = @field(cfg, name);
-        const value = b.option(
-            FieldType,
-            name,
-            "TinyUSB config: " ++ name,
-        ) orelse default;
+pub const TusbConfig = struct {
+    pid: u16 = 0x4001,
+    vid: u16 = 0xcafe,
+    bcd: u16 = 0x0200,
+    id: []const u8 = "000000000001",
 
-        @field(cfg, name) = value;
-    }
+    manufacturer: []const u8 = "Ztusb",
+    product: []const u8 = "Ztusb device",
 
-    return cfg;
-}
+    mcu: []const u8 = "OPT_MCU_STM32F4",
+    os: []const u8 = "OPT_OS_NONE",
+    debug: u8 = 0,
 
-fn create_tusb_descriptors_file(b: *std.Build, config: TusbConfig) []u8 {
-    var next_index: u8 = 4;
+    device: bool = false,
+    host: bool = false,
+    device_max_speed: []const u8 = "OPT_MODE_FULL_SPEED",
+    host_max_speed: []const u8 = "OPT_MODE_FULL_SPEED",
 
-    var cdc_index: u8 = 0;
-    var msc_index: u8 = 0;
+    mem_section: []const u8 = "",
+    mem_alignment: u32 = 4,
 
-    var fs_config_cdc: []u8 = "";
-    // var string_desc_cdc: []u8 = "";
+    endpoint0_size: u32 = 64,
 
-    var fs_config_msc: []u8 = "";
-    // var string_desc_msc: []u8 = "";
+    cdc_device: bool = false,
+    msc_device: bool = false,
+    hid_device: bool = false,
+    midi_device: bool = false,
 
-    if (config.cdc_device == true) {
-        cdc_index = next_index;
-        next_index += 1;
-        fs_config_cdc = b.allocator.print(
-            "TUD_CDC_DESCRIPTOR(ITF_NUM_CDC, 4, EPNUM_CDC_NOTIF, 16, EPNUM_CDC_OUT, EPNUM_CDC_IN, 64),",
-            .{},
-        ) catch @panic("OOM");
-    }
+    cdc_str_desc: []const u8 = "Ztusb CDC",
+    cdc_notify: bool = true,
+    cdc_rx_bufsize: u32 = 64,
+    cdc_tx_bufsize: u32 = 64,
+    cdc_rx_epsize: u32 = 64,
+    cdc_tx_epsize: u32 = 64,
 
-    if (config.msc_device == true) {
-        msc_index = next_index;
-        next_index += 1;
-        fs_config_msc = b.allocator.print(
-            "TUD_MSC_DESCRIPTOR(ITF_NUM_MSC, 5, EPNUM_MSC_OUT, EPNUM_MSC_IN, 64),",
-            .{},
-        ) catch @panic("OOM");
-    }
+    midi_str_desc: []const u8 = "Ztusb MIDI",
+    midi_rx_bufsize: u32 = 64,
+    midi_tx_bufsize: u32 = 64,
 
-    const descriptors_file: []u8 = b.allocator.print(
-        \\/*
-        \\ * The MIT License (MIT)
-        \\ *
-        \\ * Copyright (c) 2019 Ha Thach (tinyusb.org)
-        \\ *
-        \\ * Permission is hereby granted, free of charge, to any person obtaining a copy
-        \\ * of this software and associated documentation files (the "Software"), to deal
-        \\ * in the Software without restriction, including without limitation the rights
-        \\ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-        \\ * copies of the Software, and to permit persons to whom the Software is
-        \\ * furnished to do so, subject to the following conditions:
-        \\ *
-        \\ * The above copyright notice and this permission notice shall be included in
-        \\ * all copies or substantial portions of the Software.
-        \\ *
-        \\ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-        \\ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-        \\ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-        \\ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-        \\ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-        \\ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-        \\ * THE SOFTWARE.
-        \\ *
-        \\ */
-        \\
-        \\#include "tusb.h"
-        \\
-        \\//--------------------------------------------------------------------+
-        \\// Device Descriptors
-        \\//--------------------------------------------------------------------+
-        \\static tusb_desc_device_t const desc_device = {{
-        \\    .bLength            = sizeof(tusb_desc_device_t),
-        \\    .bDescriptorType    = TUSB_DESC_DEVICE,
-        \\    .bcdUSB             = 0x{x},
-        \\    .bDeviceClass       = TUSB_CLASS_MISC,
-        \\    .bDeviceSubClass    = MISC_SUBCLASS_COMMON,
-        \\    .bDeviceProtocol    = MISC_PROTOCOL_IAD,
-        \\    .bMaxPacketSize0    = CFG_TUD_ENDPOINT0_SIZE,
-        \\
-        \\    .idVendor           = 0x{x},
-        \\    .idProduct          = 0x{x},
-        \\    .bcdDevice          = 0x0100,
-        \\
-        \\    .iManufacturer      = 0x01,
-        \\    .iProduct           = 0x02,
-        \\    .iSerialNumber      = 0x03,
-        \\
-        \\    .bNumConfigurations = 0x01
-        \\}};
-        \\
-        \\uint8_t const *tud_descriptor_device_cb(void) {{
-        \\  return (uint8_t const *) &desc_device;
-        \\}}
-        \\
-        \\enum {{ // TODO
-        \\  ITF_NUM_CDC = 0,
-        \\  ITF_NUM_CDC_DATA,
-        \\  ITF_NUM_MSC,
-        \\  ITF_NUM_TOTAL
-        \\}};
-        \\
-        \\static uint8_t const desc_fs_configuration[] = {{
-        \\    // Config number, interface count, string index, total length, attribute, power in mA
-        \\    TUD_CONFIG_DESCRIPTOR(1, ITF_NUM_TOTAL, 0, CONFIG_TOTAL_LEN, 0x00, 100),
-        \\
-        \\    // Interface number, string index, EP notification address and size, EP data address (out, in) and size.
-        \\    {s}
-        \\
-        \\    // Interface number, string index, EP Out & EP In address, EP size
-        \\    {s}
-        \\}};
-        \\
-        \\
-        \\uint8_t const *tud_descriptor_configuration_cb(uint8_t index) {{
-        \\  (void) index; // for multiple configurations
-        \\  return desc_fs_configuration;
-        \\}}
-        \\
-        \\
-        \\enum {{
-        \\  STRID_LANGID = 0,
-        \\  STRID_MANUFACTURER,
-        \\  STRID_PRODUCT,
-        \\  STRID_SERIAL,
-        \\}};
-        \\
-        \\// array of pointer to string descriptors
-        \\static char const *string_desc_arr[] = {{
-        \\    (const char[]) {{ 0x09, 0x04 }}, // 0: is supported language is English (0x0409)
-        \\    "TinyUSB",                     // 1: Manufacturer // TODO
-        \\    "TinyUSB Device",              // 2: Product // TODO
-        \\    {s},                           // 3: Serials will use unique ID if possible
-        \\    "TinyUSB CDC", // TODO
-        \\    "TinyUSB MSC", // TODO
-        \\}};
-        \\
-        \\static uint16_t _desc_str[32 + 1];
-        \\
-        \\uint16_t const *tud_descriptor_string_cb(uint8_t index, uint16_t langid) {{
-        \\  (void) langid;
-        \\  size_t chr_count;
-        \\
-        \\  switch ( index ) {{
-        \\    case STRID_LANGID:
-        \\      memcpy(&_desc_str[1], string_desc_arr[0], 2);
-        \\      chr_count = 1;
-        \\      break;
-        \\
-        \\    default:
-        \\      if ( !(index < sizeof(string_desc_arr) / sizeof(string_desc_arr[0])) ) {{ return NULL; }}
-        \\
-        \\      const char *str = string_desc_arr[index];
-        \\
-        \\      // Cap at max char
-        \\      chr_count = strlen(str);
-        \\      size_t const max_count = sizeof(_desc_str) / sizeof(_desc_str[0]) - 1; // -1 for string type
-        \\      if ( chr_count > max_count ) {{ chr_count = max_count; }}
-        \\
-        \\      // Convert ASCII string into UTF-16
-        \\      for ( size_t i = 0; i < chr_count; i++ ) {{
-        \\        _desc_str[1 + i] = str[i];
-        \\      }}
-        \\      break;
-        \\  }}
-        \\
-        \\  _desc_str[0] = (uint16_t) ((TUSB_DESC_STRING << 8) | (2 * chr_count + 2));
-        \\  return _desc_str;
-        \\}}
-    , .{ config.bcd, config.vid, config.pid, fs_config_cdc, fs_config_msc, config.id }) catch @panic("OOM");
-
-    return descriptors_file;
-}
+    msc_str_desc: []const u8 = "Ztusb MSC",
+    msc_ep_bufsize: u32 = 512,
+};
 
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
@@ -193,7 +60,48 @@ pub fn build(b: *std.Build) void {
     // build options
     const driver = b.option(TusbDriver, "driver", "USB controller driver") orelse .dwc2;
 
-    const cfg = create_tusb_build_options(b);
+    const cfg = TusbConfig{
+        .pid = b.option(u16, "pid", "USB PID") orelse 0x4001,
+        .vid = b.option(u16, "vid", "USB VID") orelse 0xcafe,
+        .bcd = b.option(u16, "bcd", "USB BCD") orelse 0x0200,
+        .id = b.option([]const u8, "id", "Unique ID") orelse "000000000001",
+
+        .manufacturer = b.option([]const u8, "manufacturer", "Manufacturer string descriptor") orelse "Ztusb",
+        .product = b.option([]const u8, "product", "Product string descriptor") orelse "Ztusb device",
+
+        .mcu = b.option([]const u8, "mcu", "MCU family option, e.g. for STM32F4, -> OPT_MCU_STM32F4") orelse "OPT_MCU_STM32F4",
+        .os = b.option([]const u8, "os", "RTOS name option, e.g. for no os, -> OPT_OS_NONE") orelse "OPT_OS_NONE",
+        .debug = b.option(u8, "debug", "CFG_TUSB_DEBUG level") orelse 0,
+
+        .device = b.option(bool, "device", "Enable USB device stack") orelse false,
+        .host = b.option(bool, "host", "Enable USB host stack") orelse false,
+        .device_max_speed = b.option([]const u8, "device_max_speed", "CFG_TUD_MAX_SPEED value") orelse "OPT_MODE_FULL_SPEED",
+        .host_max_speed = b.option([]const u8, "host_max_speed", "CFG_TUD_MAX_SPEED value") orelse "OPT_MODE_FULL_SPEED",
+
+        .mem_section = b.option([]const u8, "mem_section", "RAM section name for DMA buffers (e.g. .dma_buffer)") orelse "",
+        .mem_alignment = b.option(u32, "mem_align", "CFG_TUSB_MEM_ALIGN value") orelse 4,
+
+        .endpoint0_size = b.option(u32, "ep0_size", "CFG_TUD_ENDPOINT0_SIZE") orelse 64,
+
+        .cdc_device = b.option(bool, "cdc_device", "Enable CDC class for device") orelse false,
+        .msc_device = b.option(bool, "msc_device", "Enable MSC class for device") orelse false,
+        .hid_device = b.option(bool, "hid_device", "Enable HID class for device") orelse false,
+        .midi_device = b.option(bool, "mid_device", "Enable MIDI class for device") orelse false,
+
+        .cdc_str_desc = b.option([]const u8, "cdc_str_desc", "CDC device string descriptor") orelse "Ztusb CDC",
+        .cdc_notify = b.option(bool, "cdc_notify", "Enable CDC notify endpoint") orelse true,
+        .cdc_rx_bufsize = b.option(u32, "cdc_rx_bufsize", "") orelse 64,
+        .cdc_tx_bufsize = b.option(u32, "cdc_tx_bufsize", "") orelse 64,
+        .cdc_rx_epsize = b.option(u32, "cdc_rx_epsize", "") orelse 64,
+        .cdc_tx_epsize = b.option(u32, "cdc_tx_epsize", "") orelse 64,
+
+        .midi_str_desc = b.option([]const u8, "midi_str_desc", "MIDI device string descriptor") orelse "Ztusb MIDI",
+        .midi_rx_bufsize = b.option(u32, "midi_rx_bufsize", "") orelse 64,
+        .midi_tx_bufsize = b.option(u32, "midi_tx_bufsize", "") orelse 64,
+
+        .msc_str_desc = b.option([]const u8, "msc_str_desc", "MSC device string descriptor") orelse "Ztusb MSC",
+        .msc_ep_bufsize = b.option(u32, "msc_ep_bufsize", "") orelse 512,
+    };
 
     // we want to expose build options for facilitating usb_descriptors.c file generation
     const options = b.addOptions();
@@ -205,7 +113,8 @@ pub fn build(b: *std.Build) void {
     // config header autogen from build options
     const tusb_config_header = GenConfig.create_tusb_config_header(b, cfg);
 
-    const descriptors_file: []const u8 = create_tusb_descriptors_file(b, cfg);
+    // usb_descriptors autogen from build options
+    const descriptors_file: []const u8 = GenDescriptors.create_tusb_descriptors_file(b, cfg);
     const wf = b.addWriteFiles();
     const descriptors_c = wf.add("usb_descriptors.c", descriptors_file);
 
@@ -229,7 +138,7 @@ pub fn build(b: *std.Build) void {
     });
     tusb_translate.addIncludePath(foundation_dep.path("include"));
 
-    // Actual module
+    // Actual library module
     const ztusb = b.addModule("ztusb", .{
         .root_source_file = b.path("src/root.zig"),
         .target = target,
