@@ -3,33 +3,7 @@ const TusbDriver = @import("../../build.zig").TusbDriver;
 const TusbConfig = @import("../../build.zig").TusbConfig;
 
 pub fn create_tusb_descriptors_file(b: *std.Build, config: TusbConfig) []u8 {
-    var next_index: u8 = 4;
-
-    var cdc_index: u8 = 0;
-    var msc_index: u8 = 0;
-
-    var fs_config_cdc: []u8 = "";
-    var fs_config_msc: []u8 = "";
-
-    // TODO DRY
-    if (config.cdc_device == true) {
-        cdc_index = next_index;
-        next_index += 1;
-        fs_config_cdc = b.allocator.print(
-            "TUD_CDC_DESCRIPTOR(ITF_NUM_CDC, {d}, EPNUM_CDC_NOTIF, 16, EPNUM_CDC_OUT, EPNUM_CDC_IN, 64),",
-            .{cdc_index},
-        ) catch @panic("OOM");
-    }
-
-    if (config.msc_device == true) {
-        msc_index = next_index;
-        next_index += 1;
-        fs_config_msc = b.allocator.print(
-            "TUD_MSC_DESCRIPTOR(ITF_NUM_MSC, {d}, EPNUM_MSC_OUT, EPNUM_MSC_IN, 64),",
-            .{msc_index},
-        ) catch @panic("OOM");
-    }
-
+    const fs_configuration = get_fs_configuration(b, config);
     const str_descriptors = get_string_descriptors(b, config);
 
     const descriptors_file: []u8 = b.allocator.print(
@@ -95,23 +69,12 @@ pub fn create_tusb_descriptors_file(b: *std.Build, config: TusbConfig) []u8 {
         \\  ITF_NUM_TOTAL
         \\}};
         \\
-        \\static uint8_t const desc_fs_configuration[] = {{
-        \\    // Config number, interface count, string index, total length, attribute, power in mA
-        \\    TUD_CONFIG_DESCRIPTOR(1, ITF_NUM_TOTAL, 0, CONFIG_TOTAL_LEN, 0x00, 100),
-        \\
-        \\    // Interface number, string index, EP notification address and size, EP data address (out, in) and size.
-        \\    {s}
-        \\
-        \\    // Interface number, string index, EP Out & EP In address, EP size
-        \\    {s}
-        \\}};
-        \\
+        \\{s}
         \\
         \\uint8_t const *tud_descriptor_configuration_cb(uint8_t index) {{
         \\  (void) index; // for multiple configurations
         \\  return desc_fs_configuration;
         \\}}
-        \\
         \\
         \\enum {{
         \\  STRID_LANGID = 0,
@@ -154,9 +117,61 @@ pub fn create_tusb_descriptors_file(b: *std.Build, config: TusbConfig) []u8 {
         \\  _desc_str[0] = (uint16_t) ((TUSB_DESC_STRING << 8) | (2 * chr_count + 2));
         \\  return _desc_str;
         \\}}
-    , .{ config.bcd, config.vid, config.pid, fs_config_cdc, fs_config_msc, str_descriptors }) catch @panic("OOM");
+    , .{ config.bcd, config.vid, config.pid, fs_configuration, str_descriptors }) catch @panic("OOM");
 
     return descriptors_file;
+}
+
+fn format_fs_class_config(b: *std.Build, config: TusbConfig, comptime class_name: []const u8, index: *u8) []const u8 {
+    inline for (.{ "cdc_device", "msc_device", "midi_device" }, 0..) |name, i| {
+        if (std.mem.eql(u8, name, class_name) and @field(config, class_name) == true) {
+            index.* += 1;
+
+            switch (i) {
+                0 => {
+                    return b.allocator.print(
+                        "TUD_CDC_DESCRIPTOR(ITF_NUM_CDC, {d}, EPNUM_CDC_NOTIF, 16, EPNUM_CDC_OUT, EPNUM_CDC_IN, 64),",
+                        .{index.*},
+                    ) catch @panic("OOM");
+                },
+                1 => {
+                    return b.allocator.print(
+                        "TUD_MSC_DESCRIPTOR(ITF_NUM_MSC, {d}, EPNUM_MSC_OUT, EPNUM_MSC_IN, 64),",
+                        .{index.*},
+                    ) catch @panic("OOM");
+                },
+                2 => {
+                    return ""; // TODO
+                },
+                else => unreachable,
+            }
+        }
+    }
+
+    return "";
+}
+
+fn get_fs_configuration(b: *std.Build, config: TusbConfig) []const u8 {
+    var next_index: u8 = 3; // first class should be index 4. index is incremented before writing.
+
+    const fs_config_cdc: []const u8 = format_fs_class_config(b, config, "cdc_device", &next_index);
+    const fs_config_msc: []const u8 = format_fs_class_config(b, config, "msc_device", &next_index);
+
+    // TODO this prints empty lines. It works, but i don't like it. ArrayList?
+    return b.allocator.print(
+        \\static uint8_t const desc_fs_configuration[] = {{
+        \\    // Config number, interface count, string index, total length, attribute, power in mA
+        \\    TUD_CONFIG_DESCRIPTOR(1, ITF_NUM_TOTAL, 0, CONFIG_TOTAL_LEN, 0x00, 100),
+        \\
+        \\    // Interface number, string index, EP notification address and size, EP data address (out, in) and size.
+        \\    {s}
+        \\
+        \\    // Interface number, string index, EP Out & EP In address, EP size
+        \\    {s}
+        \\}};
+    ,
+        .{ fs_config_cdc, fs_config_msc },
+    ) catch @panic("OOM");
 }
 
 fn get_string_descriptors(b: *std.Build, config: TusbConfig) []const u8 {
@@ -173,7 +188,7 @@ fn get_string_descriptors(b: *std.Build, config: TusbConfig) []const u8 {
         .{ config.manufacturer, config.product, config.id },
     ) catch @panic("OOM");
 
-    // TODO DRY
+    // TODO DRY with an ArrayList
     var str_desc_cdc: []const u8 = "";
     if (config.cdc_device == true) {
         str_desc_cdc = b.allocator.print(
