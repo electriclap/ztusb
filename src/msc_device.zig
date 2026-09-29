@@ -54,3 +54,5 @@ pub const MSC_Device = struct {
         @export(&S.scsi, .{ .name = "tud_msc_scsi_cb" });
     }
 };
+
+pub const MSC_TestDisk = struct {};

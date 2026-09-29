@@ -11,46 +11,46 @@ pub const TusbDriver = enum {
 };
 
 pub const TusbConfig = struct {
-    pid: u16 = 0x4001,
-    vid: u16 = 0xcafe,
-    bcd: u16 = 0x0200,
-    id: []const u8 = "000000000001",
+    pid: u16,
+    vid: u16,
+    bcd: u16,
+    id: []const u8,
 
-    manufacturer: []const u8 = "Ztusb",
-    product: []const u8 = "Ztusb device",
+    manufacturer: []const u8,
+    product: []const u8,
 
-    mcu: []const u8 = "OPT_MCU_STM32F4",
-    os: []const u8 = "OPT_OS_NONE",
-    debug: u8 = 0,
+    mcu: []const u8,
+    os: []const u8,
+    debug: u8,
 
-    device: bool = false,
-    host: bool = false,
-    device_max_speed: []const u8 = "OPT_MODE_FULL_SPEED",
-    host_max_speed: []const u8 = "OPT_MODE_FULL_SPEED",
+    device: bool,
+    host: bool,
+    device_max_speed: []const u8,
+    host_max_speed: []const u8,
 
-    mem_section: []const u8 = "",
-    mem_alignment: u32 = 4,
+    mem_section: []const u8,
+    mem_alignment: u32,
 
-    endpoint0_size: u32 = 64,
+    endpoint0_size: u32,
 
-    cdc_device: bool = false,
-    msc_device: bool = false,
-    hid_device: bool = false,
-    midi_device: bool = false,
+    cdc_device: bool,
+    msc_device: bool,
+    hid_device: bool,
+    midi_device: bool,
 
-    cdc_str_desc: []const u8 = "Ztusb CDC",
-    cdc_notify: bool = true,
-    cdc_rx_bufsize: u32 = 64,
-    cdc_tx_bufsize: u32 = 64,
-    cdc_rx_epsize: u32 = 64,
-    cdc_tx_epsize: u32 = 64,
+    cdc_str_desc: []const u8,
+    cdc_notify: bool,
+    cdc_rx_bufsize: u32,
+    cdc_tx_bufsize: u32,
+    cdc_rx_epsize: u32,
+    cdc_tx_epsize: u32,
 
-    midi_str_desc: []const u8 = "Ztusb MIDI",
-    midi_rx_bufsize: u32 = 64,
-    midi_tx_bufsize: u32 = 64,
+    midi_str_desc: []const u8,
+    midi_rx_bufsize: u32,
+    midi_tx_bufsize: u32,
 
-    msc_str_desc: []const u8 = "Ztusb MSC",
-    msc_ep_bufsize: u32 = 512,
+    msc_str_desc: []const u8,
+    msc_ep_bufsize: u32,
 };
 
 pub fn build(b: *std.Build) void {
