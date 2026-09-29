@@ -6,10 +6,8 @@ pub const types = @import("types.zig");
 pub const Device = @import("device.zig").Device;
 pub const CDC_Device = @import("cdc_device.zig").CDC_Device;
 
-pub const MSC_Device = if (build_options.msc_device and build_options.tud_enabled)
-    @import("msc_device.zig").MSC_Device
-else
-    struct {};
+pub const MSC_Device = @import("msc_device.zig").MSC_Device;
+pub const MSC_TestDisk = @import("msc_device.zig").MSC_TestDisk;
 
 // GENERAL CALLBACKS //
 
