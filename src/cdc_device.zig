@@ -1,44 +1,44 @@
-const shim = @import("tusb_shim");
+const bridge = @import("tusb_bridge");
 
 /// Encapsulate cdc_device API. Only supports one CDC atm.
 pub const CDC_Device = struct {
     pub fn is_ready() bool {
-        return shim.usbd_cdc_is_ready();
+        return bridge.usbd_cdc_is_ready();
     }
 
     /// return true if the comport is opened
     pub fn is_connected() bool {
-        return shim.usbd_cdc_is_connected();
+        return bridge.usbd_cdc_is_connected();
     }
 
     /// available bytes for reading
     pub fn get_available_bytes() u32 {
-        return shim.usbd_cdc_available();
+        return bridge.usbd_cdc_available();
     }
 
     pub fn read(buf: []u8) usize {
-        return shim.usbd_cdc_read(buf.ptr, @intCast(buf.len));
+        return bridge.usbd_cdc_read(buf.ptr, @intCast(buf.len));
     }
 
     /// returns -1 if no char is read
     pub fn read_char() i32 {
-        return shim.usbd_cdc_read_char();
+        return bridge.usbd_cdc_read_char();
     }
 
     pub fn read_flush() void {
-        shim.usbd_cdc_read_flush();
+        bridge.usbd_cdc_read_flush();
     }
 
     pub fn write(buf: []const u8) usize {
-        return shim.usbd_cdc_write(buf.ptr, @intCast(buf.len));
+        return bridge.usbd_cdc_write(buf.ptr, @intCast(buf.len));
     }
 
     pub fn write_char(char: u8) usize {
-        return shim.usbd_cdc_write(&char, 1);
+        return bridge.usbd_cdc_write(&char, 1);
     }
 
     pub fn write_flush() void {
-        shim.usbd_cdc_write_flush();
+        bridge.usbd_cdc_write_flush();
     }
 
     /// call through a comptime block to map tiny usb cdc device callbacks to yours

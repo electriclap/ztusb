@@ -4,17 +4,16 @@ A zig wrapper for tiny usb. Intended to be used alongside micro zig.
 
 ## Support
 
-- tusb_config.h autogen at build
-- usb_descriptors.c autogen at build
-- usb full speed
+- tusb_config.h and usb_descriptors.c autogen at build
+- usb device full speed
 - cdc device
 - msc device
+- midi device
 
-## TODO
+## Next
 
-- all drivers support
-- all mcus support
-- more class support
+- host support
+- audio and mtp classes support
 
 ## How to use
 
@@ -27,10 +26,10 @@ If you need external dependencies, fetch them also. tinyusb wiki lists all possi
 
 https://docs.tinyusb.org/en/latest/reference/dependencies.html
 
-for exemple, for my stm32f407 : 
+example, for a stm32f407 : 
 
 ```zig
-zig fetch --save=cmsis_device_f4 ""
+zig fetch --save=cmsis_device_f4 "git+https://github.com/STMicroelectronics/cmsis_device_f4"
 ```
 
 Then, add these following lines to your microzig project build.zig (cdc device example) : 
@@ -41,7 +40,7 @@ Then, add these following lines to your microzig project build.zig (cdc device e
     const ztusb_config = b.dependency("ztusb", .{
         .target = target,
         .optimize = optimize,
-        .driver = .dwc2,  // check out tinu usb repo for choosing the right driver for your mcu
+        .driver = .dwc2,  // check out tiny usb repo for choosing the right driver for your mcu
         .device = true,
         .cdc = true,
     });

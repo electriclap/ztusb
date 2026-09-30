@@ -131,7 +131,7 @@ pub fn build(b: *std.Build) void {
 
     // shim module
     const tusb_translate = b.addTranslateC(.{
-        .root_source_file = b.path("src/tusb_shim.h"),
+        .root_source_file = b.path("src/c_bridge/tusb_bridge.h"),
         .target = target,
         .optimize = optimize,
         .link_libc = false,
@@ -144,7 +144,7 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
-    ztusb.addImport("tusb_shim", tusb_translate.createModule());
+    ztusb.addImport("tusb_bridge", tusb_translate.createModule());
     ztusb.addImport("build_options", options.createModule());
 
     ztusb.addIncludePath(b.path("src"));
@@ -212,8 +212,8 @@ pub fn build(b: *std.Build) void {
     });
 
     ztusb.addCSourceFiles(.{
-        .root = b.path("src/"),
-        .files = &.{"tusb_shim.c"},
+        .root = b.path("src/c_bridge/"),
+        .files = &.{"tusb_bridge.c"},
         .flags = flags,
     });
 

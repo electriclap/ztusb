@@ -1,5 +1,5 @@
 #include "tusb.h"
-#include "tusb_shim.h"
+#include "tusb_bridge.h"
 
 
 // this global is needed is St's dependencies.

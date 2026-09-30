@@ -1,13 +1,13 @@
 const std = @import("std");
-const shim = @import("tusb_shim");
+const bridge = @import("tusb_bridge");
 
 pub const MSC_Device = struct {
     pub fn set_sense(lun: u8, sense_key: u8, add_sense_code: u8, add_sense_qualifier: u8) bool {
-        return shim.usbd_msc_set_sense(lun, sense_key, add_sense_code, add_sense_qualifier);
+        return bridge.usbd_msc_set_sense(lun, sense_key, add_sense_code, add_sense_qualifier);
     }
 
     pub fn async_io_done(bytes_io: i32, in_isr: bool) bool {
-        return shim.usbd_msc_async_io_done(bytes_io, in_isr);
+        return bridge.usbd_msc_async_io_done(bytes_io, in_isr);
     }
 
     /// TODO add optional callbacks.

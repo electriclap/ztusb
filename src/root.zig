@@ -1,6 +1,6 @@
 const build_options = @import("build_options");
 
-pub const shim = @import("tusb_shim");
+pub const bridge = @import("tusb_bridge");
 pub const types = @import("types.zig");
 
 pub const Device = @import("device.zig").Device;
