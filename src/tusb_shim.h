@@ -41,3 +41,14 @@ void     usbd_cdc_write_flush(void);
 bool     usbd_msc_set_sense(uint8_t lun, uint8_t sense_key, uint8_t add_sense_code, uint8_t add_sense_qualifier);
 bool     usbd_msc_async_io_done(int32_t bytes_io, bool in_isr);
 
+
+// MIDI Device
+bool     usbd_midi_mounted(void);
+uint32_t usbd_midi_available(void);
+uint32_t usbd_midi_stream_read(void *buffer, uint32_t bufsize);
+uint32_t usbd_midi_demux_stream_read(uint8_t *p_cable_num, void *buffer, uint32_t bufsize);
+uint32_t usbd_midi_stream_write(uint8_t cable_num, const uint8_t *buffer, uint32_t bufsize);
+bool     usbd_midi_packet_read(uint8_t packet[4]);
+uint32_t usbd_midi_packet_read_n(uint8_t packets[], uint32_t max_packets);
+bool     usbd_midi_packet_write(const uint8_t packet[4]);
+uint32_t usbd_midi_packet_write_n(const uint8_t packets[], uint32_t n_packets);

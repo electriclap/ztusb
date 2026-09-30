@@ -132,13 +132,49 @@ bool usbd_msc_async_io_done(int32_t bytes_io, bool in_isr) {
 }
 #endif
 
+
+/* USB MIDI device API */
+#if CFG_TUD_ENABLED && CFG_TUD_MIDI
+bool usbd_midi_mounted(void) {
+    return tud_midi_mounted();
+}
+
+uint32_t usbd_midi_available(void) {
+    return tud_midi_available();
+}
+
+uint32_t usbd_midi_stream_read(void *buffer, uint32_t bufsize) {
+    return tud_midi_stream_read(buffer, bufsize);
+}
+
+uint32_t usbd_midi_demux_stream_read(uint8_t *p_cable_num, void *buffer, uint32_t bufsize) {
+    return tud_midi_demux_stream_read(p_cable_num, buffer, bufsize);
+}
+
+uint32_t usbd_midi_stream_write(uint8_t cable_num, const uint8_t *buffer, uint32_t bufsize) {
+    return tud_midi_stream_write(cable_num, buffer, bufsize);
+}
+
+bool usbd_midi_packet_read(uint8_t packet[4]) {
+    return tud_midi_packet_read(packet);
+}
+
+uint32_t usbd_midi_packet_read_n(uint8_t packets[], uint32_t max_packets) {
+    return tud_midi_packet_read_n(packets, max_packets);
+}
+
+bool usbd_midi_packet_write(const uint8_t packet[4]) {
+    return tud_midi_packet_write(packet);
+}
+
+uint32_t usbd_midi_packet_write_n(const uint8_t packets[], uint32_t n_packets) {
+    return tud_midi_packet_write_n(packets, n_packets);
+}
+#endif
+
+
 /* usb host cdc shimed API */
 // TODO
-
-
-/* usb device midi shimed API */
-// TODO
-
 
 /* usb host midi shimed API */
 // TODO

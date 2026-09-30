@@ -86,7 +86,7 @@ pub fn build(b: *std.Build) void {
         .cdc_device = b.option(bool, "cdc_device", "Enable CDC class for device") orelse false,
         .msc_device = b.option(bool, "msc_device", "Enable MSC class for device") orelse false,
         .hid_device = b.option(bool, "hid_device", "Enable HID class for device") orelse false,
-        .midi_device = b.option(bool, "mid_device", "Enable MIDI class for device") orelse false,
+        .midi_device = b.option(bool, "midi_device", "Enable MIDI class for device") orelse false,
 
         .cdc_str_desc = b.option([]const u8, "cdc_str_desc", "CDC device string descriptor") orelse "Ztusb CDC",
         .cdc_notify = b.option(bool, "cdc_notify", "Enable CDC notify endpoint") orelse true,
@@ -179,7 +179,7 @@ pub fn build(b: *std.Build) void {
         "class/hid/hid_device.c",
         "class/hid/hid_host.c",
         "class/audio/audio_device.c",
-        // "class/audio/audio_host.c", Audio host will be supported in tinyusb V 0.22.0
+        // "class/audio/audio_host.c", // TODO add Audio host when tinyusb V 0.22.0 is released
         "class/mtp/mtp_device.c",
     }) catch @panic("OOM");
 
@@ -212,7 +212,7 @@ pub fn build(b: *std.Build) void {
     });
 
     ztusb.addCSourceFiles(.{
-        .root = b.path("src"),
+        .root = b.path("src/"),
         .files = &.{"tusb_shim.c"},
         .flags = flags,
     });

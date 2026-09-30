@@ -5,7 +5,7 @@ const TusbConfig = @import("../../build.zig").TusbConfig;
 const CONFIG_DESC_LEN: u32 = 9;
 const DEVICE_CDC_DESC_LEN: u32 = 66;
 const DEVICE_MSC_DESC_LEN: u32 = 23;
-const DEVICE_MIDI_DESC_LEN: u32 = 88;
+const DEVICE_MIDI_DESC_LEN: u32 = 92;
 
 const ENDPOINT_INPUT_BITMASK: u32 = 0x80;
 

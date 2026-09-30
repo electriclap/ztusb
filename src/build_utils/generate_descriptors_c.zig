@@ -6,6 +6,10 @@ pub fn create_tusb_descriptors_file(b: *std.Build, config: TusbConfig) []u8 {
     const fs_configuration = get_fs_conf_arr_and_itf_num_enum(b, config);
     const str_descriptors = get_string_descriptors(b, config);
 
+    const device_class: []const u8 = if (config.cdc_device == true) "TUSB_CLASS_MISC" else "0x00";
+    const device_subclass: []const u8 = if (config.cdc_device == true) "MISC_SUBCLASS_COMMON" else "0x00";
+    const device_protocol: []const u8 = if (config.cdc_device == true) "MISC_PROTOCOL_IAD" else "0x00";
+
     const descriptors_file: []u8 = b.allocator.print(
         \\/*
         \\ * The MIT License (MIT)
@@ -42,9 +46,9 @@ pub fn create_tusb_descriptors_file(b: *std.Build, config: TusbConfig) []u8 {
         \\    .bLength            = sizeof(tusb_desc_device_t),
         \\    .bDescriptorType    = TUSB_DESC_DEVICE,
         \\    .bcdUSB             = 0x{x},
-        \\    .bDeviceClass       = TUSB_CLASS_MISC,
-        \\    .bDeviceSubClass    = MISC_SUBCLASS_COMMON,
-        \\    .bDeviceProtocol    = MISC_PROTOCOL_IAD,
+        \\    .bDeviceClass       = {s},
+        \\    .bDeviceSubClass    = {s},
+        \\    .bDeviceProtocol    = {s},
         \\    .bMaxPacketSize0    = CFG_TUD_ENDPOINT0_SIZE,
         \\
         \\    .idVendor           = 0x{x},
@@ -110,7 +114,9 @@ pub fn create_tusb_descriptors_file(b: *std.Build, config: TusbConfig) []u8 {
         \\  _desc_str[0] = (uint16_t) ((TUSB_DESC_STRING << 8) | (2 * chr_count + 2));
         \\  return _desc_str;
         \\}}
-    , .{ config.bcd, config.vid, config.pid, fs_configuration, str_descriptors }) catch @panic("OOM");
+    ,
+        .{ config.bcd, device_class, device_subclass, device_protocol, config.vid, config.pid, fs_configuration, str_descriptors },
+    ) catch @panic("OOM");
 
     return descriptors_file;
 }
@@ -153,7 +159,7 @@ fn get_fs_conf_arr_and_itf_num_enum(b: *std.Build, config: TusbConfig) []const u
 
     fs_config_arr.append(b.allocator, start_fs_config) catch @panic("OOM");
 
-    // TODO there must be a better way?
+    // TODO there must be a better way? LUT?
     inline for (.{ "cdc_device", "msc_device", "midi_device" }, 0..) |name, i| {
         if (@field(config, name) == true) {
             switch (i) {
@@ -187,7 +193,19 @@ fn get_fs_conf_arr_and_itf_num_enum(b: *std.Build, config: TusbConfig) []const u
                     itf_num_enum_arr.append(b.allocator, "  ITF_NUM_MSC,\n") catch @panic("OOM");
                 },
                 2 => {
-                    fs_config_arr.append(b.allocator, "//TODO") catch @panic("OOM");
+                    const tmp_str = b.allocator.print(
+                        \\    
+                        \\    // Interface number, string index, EP Out & EP In address, EP size
+                        \\    TUD_MIDI_DESCRIPTOR(ITF_NUM_MIDI, {d}, EPNUM_MIDI_OUT, EPNUM_MIDI_IN, 64),
+                        \\
+                    ,
+                        .{next_index},
+                    ) catch @panic("OOM");
+
+                    fs_config_arr.append(b.allocator, tmp_str) catch @panic("OOM");
+
+                    itf_num_enum_arr.append(b.allocator, "  ITF_NUM_MIDI,\n") catch @panic("OOM");
+                    itf_num_enum_arr.append(b.allocator, "  ITF_NUM_MIDI_STREAMING,\n") catch @panic("OOM");
                 },
                 else => unreachable,
             }
@@ -208,8 +226,6 @@ fn get_fs_conf_arr_and_itf_num_enum(b: *std.Build, config: TusbConfig) []const u
 
 // TODO refactor with Arraylist
 fn get_string_descriptors(b: *std.Build, config: TusbConfig) []const u8 {
-    var next_index: u32 = 4;
-
     const str_desc_first_lines = b.allocator.print(
         \\// array of pointer to string descriptors
         \\static char const *string_desc_arr[] = {{
@@ -225,17 +241,22 @@ fn get_string_descriptors(b: *std.Build, config: TusbConfig) []const u8 {
     var str_desc_cdc: []const u8 = "";
     if (config.cdc_device == true) {
         str_desc_cdc = b.allocator.print(
-            \\    "{s}",                           // {d}: CDC string descriptor
-        , .{ config.cdc_str_desc, next_index }) catch @panic("OOM");
-        next_index += 1;
+            \\    "{s}",
+        , .{config.cdc_str_desc}) catch @panic("OOM");
     }
 
     var str_desc_msc: []const u8 = "";
     if (config.msc_device == true) {
         str_desc_msc = b.allocator.print(
-            \\    "{s}",                           // {d}: MSC string descriptor
-        , .{ config.msc_str_desc, next_index }) catch @panic("OOM");
-        next_index += 1;
+            \\    "{s}",
+        , .{config.msc_str_desc}) catch @panic("OOM");
+    }
+
+    var str_desc_midi: []const u8 = "";
+    if (config.midi_device == true) {
+        str_desc_midi = b.allocator.print(
+            \\    "{s}",
+        , .{config.midi_str_desc}) catch @panic("OOM");
     }
 
     const str_desc_last_line = b.allocator.print(
@@ -248,7 +269,8 @@ fn get_string_descriptors(b: *std.Build, config: TusbConfig) []const u8 {
         \\{s}
         \\{s}
         \\{s}
+        \\{s}
     ,
-        .{ str_desc_first_lines, str_desc_cdc, str_desc_msc, str_desc_last_line },
+        .{ str_desc_first_lines, str_desc_cdc, str_desc_msc, str_desc_midi, str_desc_last_line },
     ) catch @panic("OOM");
 }

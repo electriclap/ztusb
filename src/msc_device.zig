@@ -19,7 +19,7 @@ pub const MSC_Device = struct {
 
         const S = struct {
             fn inquiry_callback(lun: u8, vendor_id: *[8]u8, product_id: *[16]u8, product_rev: *[4]u8) callconv(.c) void {
-                return Impl.inquiry(lun, vendor_id, product_id, product_rev);
+                return Impl.inquiry(lun, vendor_id[0..8], product_id[0..16], product_rev[0..4]);
             }
 
             fn test_unit_ready_callback(lun: u8) callconv(.c) bool {
@@ -34,16 +34,17 @@ pub const MSC_Device = struct {
                 return Impl.start_stop(lun, power_condition, start, load_eject);
             }
 
-            fn read10_callback(lun: u8, lba: u32, off: u32, buf: [*]u8, size: u32) callconv(.c) i32 {
-                return Impl.read10(lun, lba, off, buf[0..size]);
+            fn read10_callback(lun: u8, lba: u32, offset: u32, buffer: [*]u8, size: u32) callconv(.c) i32 {
+                return Impl.read10(lun, lba, offset, buffer[0..size]);
             }
 
-            fn write10_callback(lun: u8, lba: u32, offset: u32, buffer: [*]const u8, bufsize: u32) callconv(.c) i32 {
-                return Impl.write10(lun, lba, offset, buffer, bufsize);
+            fn write10_callback(lun: u8, lba: u32, offset: u32, buffer: [*]const u8, size: u32) callconv(.c) i32 {
+                return Impl.write10(lun, lba, offset, buffer[0..size]);
             }
 
-            fn scsi_callback(lun: u8, scsi_cmd: *const [16]u8, buffer: ?*anyopaque, bufsize: u16) callconv(.c) i32 {
-                return Impl.scsi(lun, scsi_cmd, buffer, bufsize);
+            // TODO find a way to use slices here
+            fn scsi_callback(lun: u8, scsi_cmd: *const [16]u8, buffer: ?*anyopaque, size: u16) callconv(.c) i32 {
+                return Impl.scsi(lun, scsi_cmd, buffer, size);
             }
         };
         @export(&S.inquiry_callback, .{ .name = "tud_msc_inquiry_cb" });
@@ -66,7 +67,7 @@ const README_CONTENTS =
     "issue at github.com/hathach/tinyusb";
 
 pub var msc_disk: [DISK_BLOCK_NUM][DISK_BLOCK_SIZE]u8 = blk: {
-    var d = std.mem.zeroes([DISK_BLOCK_NUM][DISK_BLOCK_SIZE]u8);
+    var disk_content: [DISK_BLOCK_NUM][DISK_BLOCK_SIZE]u8 = @splat(@splat(0));
 
     //------------- Block0: Boot Sector -------------//
     // byte_per_sector    = DISK_BLOCK_SIZE; fat12_sector_num_16  = DISK_BLOCK_NUM;
@@ -78,43 +79,43 @@ pub var msc_disk: [DISK_BLOCK_NUM][DISK_BLOCK_SIZE]u8 = blk: {
     const boot = [_]u8{
         0xEB, 0x3C, 0x90, 0x4D, 0x53, 0x44, 0x4F, 0x53, 0x35, 0x2E, 0x30, 0x00, 0x02, 0x01, 0x01, 0x00,
         0x01, 0x10, 0x00, 0x10, 0x00, 0xF8, 0x01, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x80, 0x00, 0x29, 0x34, 0x12, 0x00, 0x00, 'T',  'i',  'n',  'y',  'U',
-        'S',  'B',  ' ',  'M',  'S',  'C',  0x46, 0x41, 0x54, 0x31, 0x32, 0x20, 0x20, 0x20, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x80, 0x00, 0x29, 0x34, 0x12, 0x00, 0x00, 'Z',  't',  'u',  's',  'b',
+        ' ',  'M',  'S',  'C',  ' ',  ' ',  0x46, 0x41, 0x54, 0x31, 0x32, 0x20, 0x20, 0x20, 0x00, 0x00,
     };
-    @memcpy(d[0][0..boot.len], &boot);
+    @memcpy(disk_content[0][0..boot.len], &boot);
     // FAT magic code at offset 510-511
-    d[0][510] = 0x55;
-    d[0][511] = 0xAA;
+    disk_content[0][510] = 0x55;
+    disk_content[0][511] = 0xAA;
 
     //------------- Block1: FAT12 Table -------------//
     const fat = [_]u8{
         0xF8, 0xFF, 0xFF, 0xFF, 0x0F, // first 2 entries must be F8FF, third entry is cluster end of readme file
     };
-    @memcpy(d[1][0..fat.len], &fat);
+    @memcpy(disk_content[1][0..fat.len], &fat);
 
     //------------- Block2: Root Directory -------------//
     const root = [_]u8{
         // first entry is volume label
-        'T',  'i',  'n',  'y',  'U',  'S',  'B',  ' ',  'M',  'S',  'C',  0x08, 0x00, 0x00, 0x00, 0x00,
+        'Z',  't',  'u',  's',  'b',  ' ',  'M',  'S',  'C',  ' ',  ' ',  0x08, 0x00, 0x00, 0x00, 0x00,
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x4F, 0x6D, 0x65, 0x43, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         // second entry is readme file
         'R',  'E',  'A',  'D',  'M',  'E',  ' ',  ' ',  'T',  'X',  'T',  0x20, 0x00, 0xC6, 0x52, 0x6D,
         0x65, 0x43, 0x65, 0x43, 0x00, 0x00, 0x88, 0x6D, 0x65, 0x43, 0x02, 0x00,
         README_CONTENTS.len, 0x00, 0x00, 0x00, // readme's files size (4 Bytes)
     };
-    @memcpy(d[2][0..root.len], &root);
+    @memcpy(disk_content[2][0..root.len], &root);
 
     //------------- Block3: Readme Content -------------//
-    @memcpy(d[3][0..README_CONTENTS.len], README_CONTENTS);
+    @memcpy(disk_content[3][0..README_CONTENTS.len], README_CONTENTS);
 
-    break :blk d;
+    break :blk disk_content;
 };
 
 /// Read-Only test MSC implementation
 /// Shows a readme.txt file on disk with content
 /// directly taken from tiny usb cdc+msc device example
 pub const MSC_TestDisk = struct {
-    pub fn inquiry(lun: u8, vendor_id: *[8]u8, product_id: *[16]u8, product_rev: *[4]u8) void {
+    pub fn inquiry(lun: u8, vendor_id: []u8, product_id: []u8, product_rev: []u8) void {
         _ = lun;
         const vid = "Ztusb";
         const pid = "Mass Storage";
@@ -153,7 +154,7 @@ pub const MSC_TestDisk = struct {
         return true;
     }
 
-    pub fn read10(lun: u8, lba: u32, off: u32, buf: []u8) i32 {
+    pub fn read10(lun: u8, lba: u32, offset: u32, buffer: []u8) i32 {
         _ = lun;
 
         // out of ramdisk
@@ -162,17 +163,17 @@ pub const MSC_TestDisk = struct {
         }
 
         // Check for overflow of offset + bufsize
-        if (((lba * DISK_BLOCK_SIZE) + off + buf.len) > (DISK_BLOCK_NUM * DISK_BLOCK_SIZE)) {
+        if (((lba * DISK_BLOCK_SIZE) + offset + buffer.len) > (DISK_BLOCK_NUM * DISK_BLOCK_SIZE)) {
             return -1;
         }
 
-        const addr: [*]const u8 = @as([*]const u8, @ptrCast(&msc_disk[lba])) + off;
-        @memcpy(buf, addr[0..buf.len]);
+        const addr: [*]const u8 = @as([*]const u8, @ptrCast(&msc_disk[lba])) + offset;
+        @memcpy(buffer, addr[0..buffer.len]);
 
-        return @intCast(buf.len);
+        return @intCast(buffer.len);
     }
 
-    pub fn write10(lun: u8, lba: u32, offset: u32, buffer: [*]const u8, bufsize: u32) i32 {
+    pub fn write10(lun: u8, lba: u32, offset: u32, buffer: []const u8) i32 {
         _ = lun;
 
         // out of ramdisk
@@ -181,15 +182,14 @@ pub const MSC_TestDisk = struct {
         }
 
         _ = offset;
-        _ = buffer;
 
-        return @intCast(bufsize);
+        return @intCast(buffer.len);
     }
 
-    pub fn scsi(lun: u8, scsi_cmd: *const [16]u8, buffer: ?*anyopaque, bufsize: u16) i32 {
+    pub fn scsi(lun: u8, scsi_cmd: *const [16]u8, buffer: ?*anyopaque, size: u16) i32 {
         _ = scsi_cmd;
         _ = buffer;
-        _ = bufsize;
+        _ = size;
 
         // currently no other commands are supported
 

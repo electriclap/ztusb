@@ -9,6 +9,8 @@ pub const CDC_Device = @import("cdc_device.zig").CDC_Device;
 pub const MSC_Device = @import("msc_device.zig").MSC_Device;
 pub const MSC_TestDisk = @import("msc_device.zig").MSC_TestDisk;
 
+pub const MIDI_Device = @import("midi_device.zig").MIDI_Device;
+
 // GENERAL CALLBACKS //
 
 pub const MillisCallbackFn = *const fn () u32;
