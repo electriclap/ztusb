@@ -20,7 +20,7 @@ Microzig repo : https://github.com/ZigEmbeddedGroup/microzig
 
 fetch with 
 ```zig
-zig fetch --save 'git+https://github.com/electriclap/ztusb#master'
+zig fetch --save 'git+https://github.com/electriclap/ztusb?ref=main'
 ``` 
 
 If you need external dependencies, fetch them also. tinyusb wiki lists all possible dependencies and where to find them:\
@@ -29,7 +29,7 @@ https://docs.tinyusb.org/en/latest/reference/dependencies.html
 example, for a stm32f407 : 
 
 ```zig
-zig fetch --save=cmsis_device_f4 "git+https://github.com/STMicroelectronics/cmsis_device_f4"
+zig fetch --save=cmsis_device_f4 'git+https://github.com/STMicroelectronics/cmsis_device_f4'
 ```
 
 Then, add these following lines to your microzig project build.zig (cdc+msc device example) : 
