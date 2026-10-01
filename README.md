@@ -65,7 +65,7 @@ const ztusb = @import("ztusb");
 
 const systick = @import("...");
 const rcc = @import("...");
-const gpio = @import("...);
+const gpio = @import("...");
 
 pub const panic = microzig.panic;
 pub const std_options = microzig.std_options(.{});
