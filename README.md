@@ -32,7 +32,7 @@ example, for a stm32f407 :
 zig fetch --save=cmsis_device_f4 'git+https://github.com/STMicroelectronics/cmsis_device_f4'
 ```
 
-Then, add these following lines to your microzig project build.zig (cdc+msc device example) : 
+Then, add this to your microzig project build.zig (cdc+msc device example) : 
 
 ```zig
     const ztusb_config = b.dependency("ztusb", .{
@@ -52,6 +52,7 @@ Then, add these following lines to your microzig project build.zig (cdc+msc devi
     // END OPTIONAL PART // 
 
     firmware.exe.root_module.addImport("ztusb", ztusb);
+    // END Ztusb build config
 ```
 
 In this main.zig example, you should see a VCOM and a Mass storage device. The Mass storage device will be named "Ztusb MSC" and contain a small readme.txt file. Also, sending a char to the device will echo it and write "Message Received!" :
@@ -61,6 +62,10 @@ In this main.zig example, you should see a VCOM and a Mass storage device. The M
 const std = @import("std");
 const microzig = @import("microzig");
 const ztusb = @import("ztusb");
+
+const systick = @import("...");
+const rcc = @import("...");
+const gpio = @import("...);
 
 pub const panic = microzig.panic;
 pub const std_options = microzig.std_options(.{});
@@ -76,16 +81,16 @@ pub const microzig_options: microzig.Options = .{
     },
 };
 
+const SYSTEM_CLOCK:u32 = 168_000_000;
+
 pub fn main() !void {
     microzig.interrupt.enable(.OTG_FS);
     microzig.interrupt.enable_interrupts();
 
     // your low level init
-    rcc.init();
-    systick.init();
-    gpio.init();
-
-    // don't forget to configure your GPIO pins and RCC for USB, Tiny USB doesn't do that for you.
+    rcc.init();     // Make sure your USB Clock is at the right frequency!!
+    systick.init(); // Tiny USB needs a millisecond timebase!!
+    gpio.init();    // don't forget to configure your GPIO pins and RCC for USB, Tiny USB doesn't do that for you!!
 
     ztusb.set_millis_callback(systick.get_tick);
     ztusb.Device.init(.PORT0, .USB_SPEED_FULL, 168_000_000);
