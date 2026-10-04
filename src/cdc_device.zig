@@ -45,7 +45,7 @@ pub const CDC_Device = struct {
     pub fn export_callbacks(comptime Impl: type) void {
         inline for (.{"on_rx"}) |name| {
             if (!@hasDecl(Impl, name))
-                @compileLog("Cdc Device callbacks namesapce is missing `pub fn " ++ name ++ "`");
+                @compileLog("Cdc Device callbacks namespace is missing `pub fn " ++ name ++ "`");
         }
 
         const S = struct {

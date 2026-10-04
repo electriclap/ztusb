@@ -2,7 +2,7 @@
     .name = .ztusb,
     .version = "0.1.0",
     .fingerprint = 0x6489b842752e49ee,
-    .minimum_zig_version = "0.17.0-dev.1936+5a625d5f3",
+    .minimum_zig_version = "0.17.0",
     .dependencies = .{
         .CMSIS_6 = .{
             .url = "git+https://github.com/ARM-software/CMSIS_6#26206e47dcf0abfbdc64eb753a0b6334b24439f6",
@@ -13,7 +13,7 @@
             .hash = "N-V-__8AADBFAQETDcj158omLpTYeidUbnafH2REqoRXXuyW",
         },
         .foundationlibc = .{
-            .url = "https://github.com/ZigEmbeddedGroup/microzig/releases/download/0.17.8/foundationlibc.tar.gz",
+            .url = "https://github.com/ZigEmbeddedGroup/microzig/releases/download/0.17.12/foundationlibc.tar.gz",
             .hash = "foundationlibc-0.0.0-LAEuPB2kAADQ5pwwSSJmg6HHD_8fZwmzng2CB61PhDLD",
         },
     },
